@@ -1,0 +1,23 @@
+# 8-node DF fine-tune of released H3 (FL2VA) into a chunk-causal model, own-caption window.
+data_dirs: [/mnt/weka/shrd/wm/mingjia/data/h3_causal/game_pilot3k_480p]
+holdout: 64
+max_chunks: 14           # up to ~10 s (17n+5 frames, 5 latents per chunk)
+window_chunks: 8
+caption_window_chunks: 1
+text_timestep: 1.0
+num_train_timesteps: 1000
+audio_loss_weight: 1.0
+lr: 1.0e-5
+warmup_steps: 200
+max_steps: 3000
+min_lr_ratio: 0.3
+grad_clip: 1.0
+ema_decay: 0.99
+ema_start_step: 200
+hsdp_shard_size: 16
+output_dir: /mnt/weka/shrd/wm/mingjia/wm_checkpoints/h3_causal
+run_name: df_8n_game_pilot
+save_every: 250
+keep_last: 2
+export_every: 500
+wandb_project: h3-causal

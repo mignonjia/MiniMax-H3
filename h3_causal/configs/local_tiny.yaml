@@ -1,0 +1,13 @@
+# One GPU, 2-layer truncation of the real weights: plumbing check only.
+data_dirs: [/mnt/weka/shrd/wm/mingjia/data/h3_causal/encode_test]
+holdout: 0
+max_chunks: 7
+num_layers: 2
+warmup_steps: 2
+max_steps: 6
+hsdp_shard_size: 1
+num_workers: 1
+output_dir: /tmp/h3_causal_local
+run_name: tiny
+save_every: 3
+keep_last: 1
