@@ -18,6 +18,6 @@ hsdp_shard_size: 16
 output_dir: /mnt/weka/shrd/wm/mingjia/wm_checkpoints/h3_causal
 run_name: df_8n_game_pilot
 save_every: 250
-keep_last: 2
+keep_last: 1
 export_every: 500
 wandb_project: h3-causal

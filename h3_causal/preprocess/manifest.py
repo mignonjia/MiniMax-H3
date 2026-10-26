@@ -51,25 +51,40 @@ def loki_manifest(csv_glob: str, local_root: str, s3_prefix: str = "s3://") -> l
     return records
 
 
-def game_manifest(num_clips: int, seed: int = 0, sources: tuple[str, ...] = ("game",)) -> list[dict]:
-    """Raw-video game windows with v7 captions (HUD intact, 10 s, per-second events)."""
-    rng = random.Random(seed)
-    parts = sorted(glob.glob(f"{GAME_V7_STORE}/part-*.csv"))
-    rng.shuffle(parts)
-    rows = {}
-    for part in parts:
-        for row in csv.DictReader(open(part)):
-            stem = row["path"].rsplit("/", 1)[-1].removesuffix("_index_0.safetensors")
-            rows[stem] = row
-        if len(rows) >= num_clips * 3:
-            break
+def game_manifest(
+    num_clips: int, seed: int = 0, sources: tuple[str, ...] = ("game",), max_per_video: int = 8
+) -> list[dict]:
+    """Raw-video game windows with v7 captions (HUD intact, 10 s, per-second events).
 
+    The v7 store is source-ordered (a part holds a few videos), so candidates are drawn from every part
+    and capped per source video; otherwise a sample is a handful of videos.
+    """
+    rng = random.Random(seed)
     manifests = f"{GAME_EXPORT}/manifests"
-    wanted = {}
+    stem_index = {}
     with open(f"{manifests}/ab_v1_raw_windows.csv") as f:
         for row in csv.DictReader(f):
-            if row["stem"] in rows and row["source"] in sources:
-                wanted[int(row["global_index"])] = row["stem"]
+            if row["source"] in sources:
+                stem_index[row["stem"]] = int(row["global_index"])
+    parts = sorted(glob.glob(f"{GAME_V7_STORE}/part-*.csv"))
+    rng.shuffle(parts)
+    rows, per_video = {}, {}
+    for part in parts:
+        part_rows = list(csv.DictReader(open(part)))
+        rng.shuffle(part_rows)
+        for row in part_rows:
+            stem = row["path"].rsplit("/", 1)[-1].removesuffix("_index_0.safetensors")
+            if stem not in stem_index:
+                continue
+            video = stem.rsplit("_c", 1)[0]
+            if per_video.get(video, 0) >= max_per_video:
+                continue
+            per_video[video] = per_video.get(video, 0) + 1
+            rows[stem] = row
+        if len(rows) >= num_clips * 2:
+            break
+
+    wanted = {stem_index[stem]: stem for stem in rows}
     fps = {}
     with open(f"{manifests}/ab_v1_raw_parent_meta.tsv") as f:
         for line in f:
@@ -109,10 +124,11 @@ def main() -> None:
     game = sub.add_parser("game")
     game.add_argument("--num-clips", type=int, default=2000)
     game.add_argument("--seed", type=int, default=0)
+    game.add_argument("--max-per-video", type=int, default=8)
     for p in (loki, game):
         p.add_argument("--out", required=True)
     args = parser.parse_args()
-    records = loki_manifest(args.csv_glob, args.local_root) if args.kind == "loki" else game_manifest(args.num_clips, args.seed)
+    records = loki_manifest(args.csv_glob, args.local_root) if args.kind == "loki" else game_manifest(args.num_clips, args.seed, max_per_video=args.max_per_video)
     with open(args.out, "w") as f:
         for record in records:
             f.write(json.dumps(record) + "\n")
