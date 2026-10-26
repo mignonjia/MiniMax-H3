@@ -37,7 +37,8 @@ _compiled_flex_attention = None
 def _flex_attention(q, k, v, block_mask):
     global _compiled_flex_attention
     if _compiled_flex_attention is None:
-        _compiled_flex_attention = torch.compile(flex_attention, dynamic=False)
+        # Packed lengths differ per clip: one dynamic-shape compile instead of a recompile per length.
+        _compiled_flex_attention = torch.compile(flex_attention, dynamic=True)
     return _compiled_flex_attention(q, k, v, block_mask=block_mask)
 
 
