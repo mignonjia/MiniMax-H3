@@ -21,5 +21,5 @@ output_dir: /mnt/weka/shrd/wm/mingjia/wm_checkpoints/h3_causal
 run_name: df_8n_diffsynth
 save_every: 250
 keep_last: 1
-export_every: 500
+export_every: 1000       # live + EMA exports are ~66 GB each
 wandb_project: h3-causal
