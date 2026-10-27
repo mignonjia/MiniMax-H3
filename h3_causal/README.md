@@ -51,12 +51,21 @@ Environment: `/mnt/weka/shrd/wm/.conda/wm-production-h200-cu129` plus diffusers 
 `H3_PYLIBS=/mnt/weka/shrd/wm/mingjia/pylibs/h3` (`pip install --target`; the shared env is untouched).
 Weights: `/mnt/weka/shrd/wm/areeb/H3` (diffusers layout).
 
+Data: public only. The fine-tune set is the T2VA subset (8,560 clips, 124 frames = 7 chunks, stereo
+32 kHz) of DiffSynth-Studio's MiniMax-H3-Self-Generated-Dataset (Apache-2.0; HF mirror
+`ml-resources/MiniMax-H3-Self-Generated-Dataset`): H3 renders with the prompts that produced them.
+Its prompts describe the whole clip, so Qwen3-VL-32B-Instruct rewrites each into the own-caption
+layout (`preprocess/chunk_captioner.py`): an H3-register global caption limited to what holds from
+the first frame (style, setting, subjects, ambient sound, music style) plus one self-contained
+visual / camera / sound caption per chunk, the sound taken from the prompt.
+
 ```bash
-# manifests: game raw windows (on weka) or Loki CSVs + locally fetched mp4s
-python -m h3_causal.preprocess.manifest game --num-clips 3000 --out game.jsonl
-python -m h3_causal.preprocess.manifest loki --csv-glob '/mnt/weka/shrd/wm/zhiyang/loki_h3_joint_training_csvs_60n_cp4_120shards/*.csv' --local-root /path/to/loki --out loki.jsonl
-# encode (restartable)
-sbatch [--nodes N] h3_causal/scripts/encode.sh game.jsonl /mnt/weka/shrd/wm/mingjia/data/h3_causal/game_pilot3k_480p
+# public data: H3 renders + their prompts -> per-chunk captions -> latents (all restartable)
+hf download ml-resources/MiniMax-H3-Self-Generated-Dataset --repo-type dataset --include 'videos/*' metadata.jsonl --local-dir RAW
+python -m h3_causal.preprocess.manifest diffsynth --root RAW --out diffsynth_t2va.jsonl
+sbatch --nodes 8 h3_causal/scripts/caption.sh diffsynth_t2va.jsonl CAPTION_DIR diffsynth_t2va_captioned.jsonl
+sbatch --nodes 8 h3_causal/scripts/encode.sh diffsynth_t2va_captioned.jsonl /mnt/weka/shrd/wm/mingjia/data/h3_causal/diffsynth_t2va_480p
+# (loki / game manifests exist for internal data; not used)
 # train: 2-node smoke, 8-node DF
 sbatch --nodes 2 h3_causal/scripts/train.sh h3_causal/configs/smoke_2n.yaml
 sbatch --nodes 8 h3_causal/scripts/train.sh h3_causal/configs/df_8n.yaml
@@ -68,4 +77,4 @@ H3_DIFFUSERS_PATH=$H3_PYLIBS python -m pytest tests/
 ```
 
 Storage: ~15 MB per 10 s clip at 480p (bf16 video latents ~5 MB, global + per-event Qwen3-VL
-embeddings ~10 MB).
+embeddings ~10 MB); ~5-7 MB per 5 s DiffSynth clip.

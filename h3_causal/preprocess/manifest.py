@@ -6,6 +6,10 @@ One line per clip:
 
     python -m h3_causal.preprocess.manifest loki --csv-glob '.../captions-*.csv' --local-root /data/loki --out loki.jsonl
     python -m h3_causal.preprocess.manifest game --num-clips 2000 --out game.jsonl
+    python -m h3_causal.preprocess.manifest diffsynth --root /data/diffsynth_h3 --out diffsynth.jsonl
+
+`diffsynth` records carry only the whole-clip H3 prompt (`caption.h3_prompt`, no events): run
+`h3_causal.preprocess.chunk_captioner` on them before encoding.
 """
 
 from __future__ import annotations
@@ -115,6 +119,18 @@ def game_manifest(
     return records
 
 
+def diffsynth_manifest(root: str) -> list[dict]:
+    """DiffSynth-Studio MiniMax-H3-Self-Generated-Dataset (Apache-2.0), T2VA subset: H3 renders + their prompts."""
+    records = []
+    with open(f"{root}/metadata.jsonl") as f:
+        for line in f:
+            row = json.loads(line)
+            clip_id = "diffsynth_" + row["video_path"].rsplit("/", 1)[-1].rsplit(".", 1)[0]
+            duration = row["num_frames"] / 24.0
+            records.append(_record(clip_id, "diffsynth_h3", f"{root}/{row['video_path']}", 0.0, duration, {"h3_prompt": row["prompt"]}, []))
+    return records
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="kind", required=True)
@@ -125,10 +141,17 @@ def main() -> None:
     game.add_argument("--num-clips", type=int, default=2000)
     game.add_argument("--seed", type=int, default=0)
     game.add_argument("--max-per-video", type=int, default=8)
-    for p in (loki, game):
+    diffsynth = sub.add_parser("diffsynth")
+    diffsynth.add_argument("--root", required=True)
+    for p in (loki, game, diffsynth):
         p.add_argument("--out", required=True)
     args = parser.parse_args()
-    records = loki_manifest(args.csv_glob, args.local_root) if args.kind == "loki" else game_manifest(args.num_clips, args.seed, max_per_video=args.max_per_video)
+    if args.kind == "loki":
+        records = loki_manifest(args.csv_glob, args.local_root)
+    elif args.kind == "game":
+        records = game_manifest(args.num_clips, args.seed, max_per_video=args.max_per_video)
+    else:
+        records = diffsynth_manifest(args.root)
     with open(args.out, "w") as f:
         for record in records:
             f.write(json.dumps(record) + "\n")

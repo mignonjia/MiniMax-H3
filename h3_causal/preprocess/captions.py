@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from h3_causal.dataset import geometry as geo
 
 TIME_KEYS = frozenset({"timestamp", "time_range_sec", "time_range", "start", "end", "event_index"})
-SKIP_GLOBAL_KEYS = frozenset({"events", "quality", "hud_persistent"})
+SKIP_GLOBAL_KEYS = frozenset({"events", "quality", "hud_persistent", "h3_prompt"})
 _SUBJECT_TAG = re.compile(r"<\|?[A-Za-z]+\d*\|?>")
 
 
@@ -90,7 +90,9 @@ def _sentence(key: str, text: str) -> str:
 
 
 def global_caption_text(caption: dict) -> str:
-    """`integrated_multimodal_description:` built from the non-event fields."""
+    """`integrated_multimodal_description:` built from the non-event fields, or `global_text` verbatim."""
+    if caption.get("global_text"):
+        return caption["global_text"]
     names = _subject_names(caption)
     parts = []
     for key in ("video_style", "perspective_view", "lighting"):

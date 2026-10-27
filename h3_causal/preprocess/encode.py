@@ -232,7 +232,7 @@ class Encoders:
 
 
 def encode_clip(encoders: Encoders, clip: dict, args) -> dict:
-    available = int(clip["max_duration_sec"] * geo.FPS)
+    available = int(clip["max_duration_sec"] * geo.FPS + 1e-6)  # 124 / 24 * 24 must stay 124
     num_chunks = min(geo.max_chunks_for_frames(available), args.max_chunks)
     if num_chunks < args.min_chunks:
         raise ValueError(f"only {num_chunks} chunks in {clip['max_duration_sec']:.2f}s")
